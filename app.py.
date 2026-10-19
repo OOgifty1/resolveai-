@@ -1,0 +1,152 @@
+
+import streamlit as st
+
+st.set_page_config(page_title="ResolveAI", page_icon="🔎",
+                   layout="wide")
+
+st.title("🔎 ResolveAI")
+st.caption("From Complaint to Resolution")
+st.write("An adaptable complaint intelligence platform.")
+
+if "cases" not in st.session_state:
+    st.session_state.cases = []
+if "config" not in st.session_state:
+    st.session_state.config = None
+
+templates = {
+    "Banking & Finance": {
+        "departments": "Customer Service, Operations, Compliance",
+        "categories": "Failed transfer, Unauthorized debit, Card issue",
+        "stages": "Received, Evidence review, Investigation, Approval, Resolved",
+        "priorities": "High: suspected fraud; Medium: failed transaction; Low: general enquiry"
+    },
+    "Healthcare": {
+        "departments": "Patient Services, Billing, Clinical Management",
+        "categories": "Appointment delay, Billing dispute, Service complaint",
+        "stages": "Received, Privacy check, Review, Follow-up, Closed",
+        "priorities": "High: immediate safety concern; Medium: service disruption; Low: general feedback"
+    },
+    "Education": {
+        "departments": "Administration, Exams, Student Affairs",
+        "categories": "Registration, Examination, Records, Student services",
+        "stages": "Received, Document check, Department review, Decision, Closed",
+        "priorities": "High: urgent deadline; Medium: administrative delay; Low: general enquiry"
+    },
+    "Telecommunications": {
+        "departments": "Customer Care, Technical Support, Billing",
+        "categories": "Network outage, Billing error, Subscription issue",
+        "stages": "Received, Classification, Technical review, Update, Resolved",
+        "priorities": "High: widespread outage; Medium: billing issue; Low: general enquiry"
+    },
+    "Retail & Hospitality": {
+        "departments": "Customer Service, Sales, Store Operations",
+        "categories": "Product issue, Refund, Delivery, Staff service",
+        "stages": "Received, Evidence check, Review, Action, Closed",
+        "priorities": "High: safety concern; Medium: refund or delivery dispute; Low: feedback"
+    },
+    "Government & Public Services": {
+        "departments": "Public Enquiries, Operations, Review Unit",
+        "categories": "Delayed service, Application issue, Staff conduct",
+        "stages": "Received, Verification, Department review, Decision, Closed",
+        "priorities": "High: urgent public-service issue; Medium: delayed application; Low: general enquiry"
+    }
+}
+
+with st.sidebar:
+    st.header("Organization setup")
+    org = st.selectbox("Organization type", list(templates) + ["Other"])
+    org_name = st.text_input("Organization name")
+    description = st.text_area(
+        "Describe the organization and its complaint process",
+        placeholder="Describe services, departments and current process..."
+    )
+    custom_type = ""
+    if org == "Other":
+        custom_type = st.text_input("Specify organization type")
+
+    if st.button("✨ Propose workflow", use_container_width=True):
+        base = templates.get(org, {
+            "departments": "Customer Service, Operations, Management",
+            "categories": "Service issue, Delay, Billing, Other",
+            "stages": "Received, Review, Investigation, Decision, Closed",
+            "priorities": "High: urgent risk; Medium: service disruption; Low: general enquiry"
+        })
+        st.session_state.config = {
+            "organization": org_name or "Demo Organization",
+            "type": custom_type if org == "Other" else org,
+            "description": description,
+            **base
+        }
+
+st.header("1. Organization workflow")
+if st.session_state.config is None:
+    st.info("Choose an organization and tap Propose workflow in the sidebar.")
+else:
+    c = st.session_state.config
+    st.success("Suggested workflow ready for administrator review.")
+    st.caption(f"{c['organization']} · {c['type']}")
+
+    with st.form("workflow_form"):
+        departments = st.text_area("Departments", c["departments"])
+        categories = st.text_area("Complaint categories", c["categories"])
+        stages = st.text_area("Investigation stages", c["stages"])
+        priorities = st.text_area("Priority rules", c["priorities"])
+        approved = st.checkbox("I have reviewed these proposed settings")
+        save = st.form_submit_button("Save approved workflow")
+
+        if save:
+            if approved:
+                c.update(departments=departments, categories=categories,
+                         stages=stages, priorities=priorities)
+                c["approved"] = True
+                st.success("Workflow saved for this demo session.")
+            else:
+                st.warning("Review and approve the workflow first.")
+
+st.divider()
+st.header("2. Register a complaint")
+
+with st.form("complaint_form", clear_on_submit=True):
+    customer = st.text_input("Demo customer reference")
+    issue = st.text_area("Complaint details")
+    category = st.text_input("Complaint category")
+    priority = st.selectbox("Priority", ["Low", "Medium", "High"])
+    submitted = st.form_submit_button("Register complaint")
+
+    if submitted:
+        if not customer.strip() or not issue.strip():
+            st.error("Enter a customer reference and complaint details.")
+        else:
+            st.session_state.cases.append({
+                "ID": f"RA-{len(st.session_state.cases)+1:04}",
+                "Reference": customer,
+                "Complaint": issue,
+                "Category": category or "Unclassified",
+                "Priority": priority,
+                "Status": "Pending"
+            })
+            st.success("Complaint registered.")
+
+st.divider()
+st.header("3. Complaint dashboard")
+cases = st.session_state.cases
+a, b, c, d = st.columns(4)
+a.metric("Total cases", len(cases))
+b.metric("Pending", sum(x["Status"] == "Pending" for x in cases))
+c.metric("High priority", sum(x["Priority"] == "High" for x in cases))
+d.metric("Resolved", sum(x["Status"] == "Resolved" for x in cases))
+
+if cases:
+    st.dataframe(cases, use_container_width=True, hide_index=True)
+    selected = st.selectbox("Update case status", [x["ID"] for x in cases])
+    status = st.selectbox("New status",
+                          ["Pending", "Under investigation", "Resolved"])
+    if st.button("Update status"):
+        for case in cases:
+            if case["ID"] == selected:
+                case["Status"] = status
+        st.success("Case status updated.")
+else:
+    st.info("Your demo cases will appear here.")
+
+st.caption("Prototype only. Uses sample data and built-in workflow templates.")
